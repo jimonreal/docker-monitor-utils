@@ -1,5 +1,7 @@
 #!/usr/bin/env ruby
 
+require_relative 'Driver/Nagios'
+
 require 'excon'
 require 'json'
 
@@ -44,7 +46,7 @@ class Container
   rescue Excon::Errors::Timeout
   rescue Excon::Errors::SocketError => e
     unless e.message.include?('inspect gathered')
-     print "Invalid Stats API endpoint", "There was an error reading from the stats API.\nAre you running Docker version 1.5+, and is /var/run/docker.sock readable by the user running scout?"
+     print "Invalid Stats API endpoint", "There was an error reading from the stats API.\nAre you running Docker version 1.5+, and is /var/run/docker.sock readable by the user running the script?"
     end
   end
 
@@ -53,7 +55,7 @@ class Container
   rescue Excon::Errors::Timeout
   rescue Excon::Errors::SocketError => e
     unless e.message.include?('stats gathered')
-     print "Invalid Stats API endpoint", "There was an error reading from the stats API.\nAre you running Docker version 1.5+, and is /var/run/docker.sock readable by the user running scout?"
+     print "Invalid Stats API endpoint", "There was an error reading from the stats API.\nAre you running Docker version 1.5+, and is /var/run/docker.sock readable by the user running the script?"
     end
   end
 
@@ -92,11 +94,12 @@ class Container
     @stats[:memory_limit] = (stats["memory_stats"]["limit"].to_f / 1024.0 / 1024.0).round(3)
     #Percentage
     @stats[:memory_percentage_usage] = ((@stats[:memory_usage]/@stats[:memory_limit])*100).round(3)
-    @stats[:network_in] = stats["network"]["rx_bytes"].to_f / 1024.0
-    @stats[:network_out] = stats["network"]["tx_bytes"].to_f / 1024.0
+    #TODO: Fix the interface to be dynamic
+    @stats[:network_in] = stats["networks"]["eth0"]["rx_bytes"].to_f / 1024.0
+    @stats[:network_out] = stats["networks"]["eth0"]["tx_bytes"].to_f / 1024.0
     @stats[:cpu_usage] = (stats["cpu_stats"]["cpu_usage"]["total_usage"].to_f).round(3)
     @stats[:cpu_system_usage] = (stats["cpu_stats"]["system_cpu_usage"].to_f).round(3)
-    #Percentage
+#    #Percentage
     @stats[:cpu_percentage_usage] = ((@stats[:cpu_usage]/@stats[:cpu_system_usage])*100).round(3)
     unless stats["blkio_stats"]["io_service_bytes_recursive"].empty?
       @stats[:disk_io_read] = stats["blkio_stats"]["io_service_bytes_recursive"].first["value"].to_f / 1024.0 / 1024.0
@@ -106,52 +109,64 @@ end
 
 class ContainerMonitor
 
-  attr_reader :containers
+  attr_reader :containers, :cpuLimits, :ramLimits, :diskLimits, :netLimits, :driver
 
-  def initialize
+  def initialize(cpuLimits, ramLimits, diskLimits, netLimits, driver, server)
     @containers = []
+    @cpuLimits = cpuLimits
+    @ramLimits = ramLimits
+    @diskLimits = diskLimits
+    @netLimits = netLimits
+#    @driver = driver
+    @driver = Nagios.new(server, cpuLimits, ramLimits, diskLimits, netLimits)
     refresh_containers
   end
 
   def read_stat(container)
-    summary_str = [ "containerId=#{container.cid}",
-		    "containerImg=#{container.img}",
-		    "containerName=#{container.names.first}"
-    ]
-
-
-  end
-
-  def send_stats
-    refresh_containers
-    containers.each do |container|
-      container.get_stats!
-      summary_str = _read_stat(container)
-
-      print "containerId=#{container.cid} "
-      print "containerImg=#{container.img} "
-      print "containerName=#{container.names.first} "
+      summary_str = "containerId=#{container.cid} " +
+          	    "containerImg=#{container.img} " +
+          	    "containerName=#{container.names.first} "
 
       container.inspect
-      container.env_vars = container.inspect_data[:env].join(" ")
-      print "#{container.env_vars} "
-
+      summary_str += "#{container.inspect_data[:env].join(' ')} "
+      
       container.get_stats!
       keepKeys = [:memory_limit, :memory_percentage_usage, :cpu_system_usage, :cpu_percentage_usage]
       container.stats.each do |key, value|
-        if keepKeys.include? key
-          print "#{key}=#{value} "
-        else
-	  diff = container.calc_difference(key)
-          print "#{key}=#{diff} "
-          container.set_prev_stats(key)
-        end
+          if keepKeys.include? key
+              summary_str += "#{key}=#{value} "
+          else
+              diff = container.calc_difference(key)
+              summary_str += "#{key}=#{diff} "
+              container.set_prev_stats(key)
+          end
       end
-      print "\n"
+
+      summary_str.rstrip
+
+      return summary_str
+  end
+
+  def send_stats(logFile)
+    refresh_containers
+    driver.reset
+    containers.each do |container|
+      container.get_stats!
+      summary_str = read_stat(container)
+      summary_hash = Hash[summary_str.scan /([^=\s]+)=(\S+)/]
+      driver.monitorContainerStats(container.cid, summary_hash)
+      logSummary(summary_str, logFile)
     end
+    driver.responseExitCode
   end
 
   private
+
+  def logSummary(str, file)
+      open(file, 'a') do |f|
+          f.puts str
+      end
+  end
 
   def get_containers
     response = ExconConnection.connection.request(:method => :get, :path => "/containers/json")
