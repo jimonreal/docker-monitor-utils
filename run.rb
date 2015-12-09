@@ -16,10 +16,13 @@ class Parser
 		options.crit_cpu = 80
 		options.warn_ram = 50
 		options.crit_ram = 80
-		options.warn_net = 50
-		options.crit_net = 80
+		options.warn_net_in = 50
+		options.crit_net_in = 80
+		options.warn_net_out = 50
+		options.crit_net_out = 80
 		options.warn_disk = 50
 		options.crit_disk = 80
+		options.driver = "nagios"
 		options.server_addr = "nagios1dal"
 
 		opt_parser = OptionParser.new do |opts|
@@ -46,14 +49,25 @@ class Parser
 			opts.on("--critical-disk", Integer, "Critical percentage limit for IO DISK usage") do |crit|
 				options.crit_disk = crit
 			end
-			opts.on("--warn-net", Integer, "Warning percentage limit for IO NET usage") do |warn|
-				options.warn_net = warn
+			opts.on("--warn-net-in", Integer, "Warning percentage limit for IO NET IN usage") do |warn|
+				options.warn_net_in = warn
 			end
-			opts.on("--critical-net", Integer, "Critical percentage limit for IO NET usage") do |crit|
-				options.crit_net = crit
+			opts.on("--critical-net-in", Integer, "Critical percentage limit for IO NET IN usage") do |crit|
+				options.crit_net_in = crit
 			end
 
-			opts.on("-s", "--server-addr [HOSTNAME]", "Hostname of nagios server") do |addr|
+			opts.on("--warn-net-out", Integer, "Warning percentage limit for IO NET OUT usage") do |warn|
+				options.warn_net_out = warn
+			end
+			opts.on("--critical-net-out", Integer, "Critical percentage limit for IO NET OUT usage") do |crit|
+				options.crit_net_out = crit
+			end
+
+			opts.on("-D", "--driver [DRIVERNAME]", "Driver to be used") do |driver|
+				options.driver = driver
+			end
+
+			opts.on("-s", "--server-addr [HOSTNAME]", "Hostname of driver server") do |addr|
 				options.server_addr = addr
 			end
 
@@ -85,10 +99,11 @@ options = Parser.parse(ARGV)
 
 cpuLimits = Limits.new(options[:warn_cpu], options[:crit_cpu])
 ramLimits = Limits.new(options[:warn_ram], options[:crit_ram])
-netLimits = Limits.new(options[:warn_net], options[:crit_net])
+netInLimits = Limits.new(options[:warn_net_in], options[:crit_net_in])
+netOutLimits = Limits.new(options[:warn_net_out], options[:crit_net_out])
 diskLimits = Limits.new(options[:warn_disk], options[:crit_disk])
 
-c = ContainerMonitor.new(cpuLimits, ramLimits, diskLimits, netLimits, "nagios", options[:server_addr])
+c = ContainerMonitor.new(cpuLimits, ramLimits, diskLimits, netInLimits, netOutLimits, options[:driver], options[:server_addr])
 loop do
 	sleep options[:delay]
 	c.send_stats(options[:log_path])

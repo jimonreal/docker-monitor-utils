@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-require_relative 'Driver/Nagios'
+require_relative 'Driver/Driver'
 
 require 'excon'
 require 'json'
@@ -102,7 +102,7 @@ class Container
 #    #Percentage
     @stats[:cpu_percentage_usage] = ((@stats[:cpu_usage]/@stats[:cpu_system_usage])*100).round(3)
     unless stats["blkio_stats"]["io_service_bytes_recursive"].empty?
-      @stats[:disk_io_read] = stats["blkio_stats"]["io_service_bytes_recursive"].first["value"].to_f / 1024.0 / 1024.0
+      @stats[:disk_io_service_bytes] = stats["blkio_stats"]["io_service_bytes_recursive"].first["value"].to_f / 1024.0 / 1024.0
     end
   end
 end
@@ -111,14 +111,13 @@ class ContainerMonitor
 
   attr_reader :containers, :cpuLimits, :ramLimits, :diskLimits, :netLimits, :driver
 
-  def initialize(cpuLimits, ramLimits, diskLimits, netLimits, driver, server)
+  def initialize(cpuLimits, ramLimits, diskLimits, netInLimits, netOutLimits, driver, server)
     @containers = []
     @cpuLimits = cpuLimits
     @ramLimits = ramLimits
     @diskLimits = diskLimits
     @netLimits = netLimits
-#    @driver = driver
-    @driver = Nagios.new(server, cpuLimits, ramLimits, diskLimits, netLimits)
+    @driver = Driver.new(driver, server, cpuLimits, ramLimits, diskLimits, netInLimits, netOutLimits)
     refresh_containers
   end
 
@@ -153,6 +152,8 @@ class ContainerMonitor
     containers.each do |container|
       container.get_stats!
       summary_str = read_stat(container)
+      print summary_str
+      print "\n\n"
       summary_hash = Hash[summary_str.scan /([^=\s]+)=(\S+)/]
       driver.monitorContainerStats(container.cid, summary_hash)
       logSummary(summary_str, logFile)

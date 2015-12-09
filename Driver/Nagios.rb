@@ -4,18 +4,19 @@ require 'socket'
 
 class Nagios
 
-    attr_reader :status, :cpuLimit, :ramLimit, :netLimit, :diskLimit, :msg, :hostname, :nagiosServer
+    attr_reader :status, :cpuLimit, :ramLimit, :netInLimit, :netOutLimit, :diskLimit, :msg, :hostname, :nagiosServer
 
     OK = 0
     WARNING = 1
     CRITICAL = 2
     UNKNOWN = 3
 
-    def initialize(server, cpuLimits, ramLimits, netLimits, diskLimits)
+    def initialize(server, cpuLimits, ramLimits, diskLimits, netInLimits, netOutLimits)
         @nagiosServer = server
 	@cpuLimit = cpuLimits
 	@ramLimit = ramLimits
-	@netLimit = netLimits
+	@netInLimit = netInLimits
+	@netOutLimit = netOutLimits
 	@diskLimit = diskLimits
 
 	@hostname = Socket.gethostname
@@ -32,13 +33,14 @@ class Nagios
 
     def monitorContainerStats(cid, stats)
 	#CPU
-        @status[:"#{cid}"][:CPU] = validateLimit(cid, stats["cpu_percentage_usage"].to_i, "CPU", cpuLimit)
+        @status[:"#{cid}"][:CPU] = validateLimit(cid, stats["cpu_percentage_usage"].to_f, "CPU", cpuLimit)
 	#RAM
-        @status[:"#{cid}"][:RAM] = validateLimit(cid, stats["memory_percentage_usage"].to_i, "RAM", ramLimit)
+        @status[:"#{cid}"][:RAM] = validateLimit(cid, stats["memory_percentage_usage"].to_f, "RAM", ramLimit)
 	#NET
-#        @status = validateLimit(cid, stats[:net_percentage_usage], "NET", netLimit)
+        @status[:"#{cid}"][:NETIN] = validateLimit(cid, stats["network_in"].to_f, "NETIN", netInLimit)
+        @status[:"#{cid}"][:NETOUT] = validateLimit(cid, stats["network_out"].to_f, "NETOUT", netOutLimit)
 	#DISK
-#        @status = validateLimit(cid, stats[:disk_percentage_usage], "DISK", diskLimit)
+        @status[:"#{cid}"][:DISK] = validateLimit(cid, stats["disk_io_service_bytes"].to_f, "DISK", diskLimit)
     end
 
     def responseExitCode

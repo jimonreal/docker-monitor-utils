@@ -1,11 +1,20 @@
 #!/usr/bin/env ruby
 
-class Driver
+require_relative 'Nagios'
+require_relative 'DummyDriver'
 
-    def initialize(driver, cpuLimits, ramLimits, diskLimits, netLimits)
-	    if driver.downcase.eql? "nagios"
-		    return Nagios.new(cpuLimits, ramLimits, diskLimits, netLimits)
-	    end
+module Driver
+    class << self
+        attr_reader :driver
+    
+        def new(driverName, server, cpuLimits, ramLimits, diskLimits, netInLimits, netOutLimits)
+    	    if driverName.downcase.eql? "nagios"
+                    @driver = Nagios.new(server, cpuLimits, ramLimits, diskLimits, netInLimits, netOutLimits)
+                else
+                    @driver = DummyDriver.new
+    	    end
+    	    return driver
+        end
     end
 end
 
