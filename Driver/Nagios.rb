@@ -44,7 +44,6 @@ class Nagios
     end
 
     def responseExitCode
-        #TODO LLAMADA A NAGIOS CON FORMAT
 	message = ""
         if msg.empty?
             message = "OK: Everything is OK"
@@ -53,7 +52,8 @@ class Nagios
 	end
 	statusExit = getStatusExit
 	response = sprintf("%s\t%s\t%d\t%s\n", hostname, "Docker Stats", statusExit, message)
-	cmd = "/usr/sbin/send_nsca -H #{nagiosServer} #{response}"
+	#cmd = "/usr/sbin/send_nsca -H #{nagiosServer} \"#{response}\""
+	cmd = "/bin/echo -H #{nagiosServer} \"#{response}\""
 	puts `#{cmd}`
     end
 
