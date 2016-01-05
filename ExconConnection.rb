@@ -146,28 +146,20 @@ class ContainerMonitor
       return summary_str
   end
 
-  def send_stats(logFile)
+  def send_stats(logger)
     refresh_containers
     driver.reset
     containers.each do |container|
       container.get_stats!
       summary_str = read_stat(container)
-      print summary_str
-      print "\n\n"
       summary_hash = Hash[summary_str.scan /([^=\s]+)=(\S+)/]
       driver.monitorContainerStats(container.cid, summary_hash)
-      logSummary(summary_str, logFile)
+      logger.info summary_str
     end
     driver.responseExitCode
   end
 
   private
-
-  def logSummary(str, file)
-      open(file, 'a') do |f|
-          f.puts str
-      end
-  end
 
   def get_containers
     response = ExconConnection.connection.request(:method => :get, :path => "/containers/json")

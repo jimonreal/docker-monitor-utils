@@ -5,6 +5,7 @@ require_relative 'Limits'
 
 require 'optparse'
 require 'ostruct'
+require 'logger'
 
 class Parser
 	def self.parse(args)
@@ -104,8 +105,14 @@ netOutLimits = Limits.new(options[:warn_net_out], options[:crit_net_out])
 diskLimits = Limits.new(options[:warn_disk], options[:crit_disk])
 
 c = ContainerMonitor.new(cpuLimits, ramLimits, diskLimits, netInLimits, netOutLimits, options[:driver], options[:server_addr])
+
+logger = Logger.new(options[:log_path], 6, 100 * 1024 * 1024)
+logger.formatter = proc do |severity, datetime, progname, msg|
+    "#{datetime}: #{msg}\n"
+end
+
 loop do
-	sleep options[:delay]
-	c.send_stats(options[:log_path])
+    sleep options[:delay]
+    c.send_stats(logger)
 end
 
