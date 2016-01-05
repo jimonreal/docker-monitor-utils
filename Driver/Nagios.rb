@@ -73,10 +73,10 @@ class Nagios
     def validateLimit(cid, usage, resource, limit)
 	status = UNKNOWN
         if usage >= limit.criticalLimit
-            msg.push("WARNING " + resource + ": The Container " + cid + " has % level of " + resource + ": " + usage)
+            msg.push("WARNING " + resource + ": The Container " + cid + " has % level of " + resource + ": " + usage.to_s)
             status = WARNING
 	elsif usage >= limit.warningLimit
-            msg.push("CRITICAL " + resource + ": The Container " + cid + " has % level of " + resource + ": " + usage)
+            msg.push("CRITICAL " + resource + ": The Container " + cid + " has % level of " + resource + ": " + usage.to_s)
             status = CRITICAL
 	else
             status = OK
