@@ -52,7 +52,7 @@ class Nagios
 	end
 	statusExit = getStatusExit
 	response = sprintf("%s\t%s\t%d\t%s\n", hostname, "Docker Stats", statusExit, message)
-	cmd = "/usr/sbin/send_nsca -H #{nagiosServer} \"#{response}\""
+	cmd = "echo -e '#{response}' | /usr/sbin/send_nsca -H #{nagiosServer} -c /etc/nagios/send_nsca.cfg"
 	puts `#{cmd}`
     end
 
