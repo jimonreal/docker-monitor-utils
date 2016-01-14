@@ -28,26 +28,14 @@ end
 
 class Container
 
-  attr_reader :cid, :names, :img, :env_vars, :stats, :prev_stats, :inspect_data
-  attr_writer :env_vars
+  attr_reader :cid, :names, :img, :stats, :prev_stats, :inspect_data
 
   def initialize(cid, names, image)
     @cid = cid
     @names = names
     @img = image
-    @env_vars = ""
-    @inspect_data = { :env => nil }
     @stats = { :memory_usage => 0.0, :memory_limit => 0.0, :memory_percentage_usage => "0.0%", :network_in => 0.0, :network_out => 0.0, :cpu => 0.0, :cpu_system_usage => 0.0, :cpu_percentage_usage => "0.0%", :disk_io_read => 0.0 }
     @prev_stats = {  :memory_usage => nil, :memory_limit => nil, :memory_percentage_usage => nil, :network_in => nil, :network_out => nil, :cpu => nil, :cpu_system_usage => nil, :cpu_percentage_usage => nil, :disk_io_read => nil }
-  end
-
-  def inspect
-    ExconConnection.connection.request(:method => :get, :path => "/containers/#{self.cid}/json", :read_timeout => 10, :response_block => streamer_inspect)
-  rescue Excon::Errors::Timeout
-  rescue Excon::Errors::SocketError => e
-    unless e.message.include?('inspect gathered')
-     print "Invalid Stats API endpoint", "There was an error reading from the stats API.\nAre you running Docker version 1.5+, and is /var/run/docker.sock readable by the user running the script?"
-    end
   end
 
   def get_stats!
@@ -68,18 +56,6 @@ class Container
   end
 
   private
-
-  def streamer_inspect
-    lambda do |chunk, remaining_bytes, total_bytes|
-      parse_inspect(self.cid, chunk)
-      raise 'inspect gathered'
-    end
-  end
-
-  def parse_inspect(container_id, inspect_string)
-    inspect = JSON.parse(inspect_string)
-    @inspect_data[:env] = inspect["Config"]["Env"]
-  end
 
   def streamer
     lambda do |chunk, remaining_bytes, total_bytes|
@@ -126,9 +102,6 @@ class ContainerMonitor
           	    "containerImg=#{container.img} " +
           	    "containerName=#{container.names.first} "
 
-      container.inspect
-      summary_str += "#{container.inspect_data[:env].join(' ')} "
-      
       container.get_stats!
       keepKeys = [:memory_limit, :memory_percentage_usage, :cpu_system_usage, :cpu_percentage_usage]
       container.stats.each do |key, value|
